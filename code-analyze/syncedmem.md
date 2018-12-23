@@ -151,6 +151,28 @@ const void* SyncedMemory::cpu_data() {
 
 > 其他成员函数的实现代码详见syncedmem-annotation.cpp
 
+### 同步示例
+
+Caffe官网上提供的何时发生内存同步的例子：
+
+```
+// Assuming that data are on the CPU initially, and we have a blob.
+const Dtype* foo;
+Dtype* bar;
+foo = blob.gpu_data(); // data copied cpu->gpu.
+foo = blob.cpu_data(); // no data copied since both have up-to-date contents.
+bar = blob.mutable_gpu_data(); // no data copied.
+// ... some operations ...
+bar = blob.mutable_gpu_data(); // no data copied when we are still on GPU.
+foo = blob.cpu_data(); // data copied gpu->cpu, since the gpu side has modified the data
+foo = blob.gpu_data(); // no data copied since both have up-to-date contents
+bar = blob.mutable_cpu_data(); // still no data copied.
+bar = blob.mutable_gpu_data(); // data copied cpu->gpu.
+bar = blob.mutable_cpu_data(); // data copied gpu->cpu.
+```
+
+> 建议不修改数据时调用`const`函数，不要调用`mutable`函数
+
 ## 内存分配与释放
 
 在 syncedmem.hpp 中有两个内联函数，不属于 SyncedMemory 类：CaffeMallocHost，CaffeFreeHost，用于内存的申请和释放。
