@@ -209,3 +209,47 @@ Pinned memory使用`cudaMallocHost`来分配CPU内存，可以防止内存页被
 - 使用`Pinned Memory`方式的CPU和GPU之间传输速度更大，但是分配和释放的耗时更大
 - 使用`Non-Pinned Memory`的方式CPU和GPU之间传输耗时更大，但是分配和释放更快
 - 当传输的数据比较大，且均需从CPU传至GPU和从GPU传至CPU时，使用`Pinned Memory`可以获得更好的性能
+
+## 主存模型
+
+1、传统的CUDA程序设计
+
+```
+->计算前
+cudaMalloc(....)          【分配显存空间】
+cudaMemset(....)　　 【显存空间置0】
+cudaMemcpy(....)　   【将数据从内存复制到显存】
+
+->计算后
+cudaMemcpy(....)       【将数据从显存复制回内存】
+```
+
+2、CPU/GPU异构设计
+
+caffe设计了主存管理自动机，按照一定逻辑设计状态转移代码
+
+![state](../pic/mem-state-machine.png)
+
+四个状态触发函数：cpu_data()、gpu_data()、mutable_cpu_data()、mutable_gpu_data()
+
+四个状态转移函数：to_cpu()、to_gpu()、mutable_cpu()、mutable_gpu()
+
+**UNINITIALIZED**
+
+生命周期很短，随着CPU或GPU其中的任一个申请内存而终结。
+
+**HEAD_AT_CPU**
+
+表明最近一次数据的修改，是由CPU触发的。
+
+**HEAD_AT_GPU**
+
+表明最近一次数据的修改，是由GPU触发的。
+
+在GPU工作时，该状态将成为所有状态里生命周期第二短的，通常自动机都处于SYNCED和HEAD_AT_GPU状态，因为大部分数据的修改工作都是GPU触发的。
+
+**SYNCED**
+
+标记内存显存的数据一致情况。
+
+如果遇到**HEAD_AT_CPU**，却要访问显存。或是**HEAD_AT_GPU**，却要访问内存，理论上，得先进行主存复制。但如果内存和显存的数据是一致的，就没必要来回复制。
